@@ -106,7 +106,7 @@ async function checkBuild(cfg: ShipConfig, p: TargetPlan): Promise<Array<{ ok: b
     const bin = path.join(p.buildDir, p.target === "windows" ? `${cfg.id}.exe` : `${cfg.id}.x86_64`);
     const head = existsSync(bin) ? (await readFile(bin)).subarray(0, 4) : Buffer.alloc(0);
     const ok = p.target === "windows" ? head.subarray(0, 2).toString("latin1") === "MZ" : head.equals(Buffer.from([0x7f, 0x45, 0x4c, 0x46]));
-    c.push({ ok, label: `${path.basename(bin)} is a ${p.target === "windows" ? "PE (MZ)" : "ELF"} executable` });
+    c.push({ ok, label: `${path.basename(bin)} is ${p.target === "windows" ? "a PE (MZ)" : "an ELF"} executable` });
     c.push({ ok: !files.some((f) => f.endsWith(".pck")), label: "game data embedded in the executable (single file)" });
   } else if (p.target === "android") {
     const apk = p.artifact;
