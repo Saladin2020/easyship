@@ -1,8 +1,9 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { copyFile, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { ShipConfig, ShipPlan, Target, TargetPlan } from "../shared/types.js";
+import { godotExportError, hasEtc2Astc, javaHome, prepareAndroidEnv, withEtc2Astc } from "./android.js";
 import { doctor, type Doctor } from "./doctor.js";
 import { planShip } from "./plan.js";
 import { mergePresets } from "./presets.js";
@@ -76,7 +77,30 @@ export async function scanSecrets(dir: string): Promise<string[]> {
   return bad;
 }
 
-async function checkBuild(cfg: ShipConfig, p: TargetPlan): Promise<Array<{ ok: boolean; label: string }>> {
+/** PE header of a Windows executable: MZ → e_lfanew → "PE\0\0", COFF machine, optional-header magic and subsystem. */
+export function peInfo(buf: Buffer): { machine: number; magic: number; subsystem: number } | null {
+  if (buf.length < 0x40 || buf.toString("latin1", 0, 2) !== "MZ") return null;
+  const pe = buf.readUInt32LE(0x3c);
+  if (pe + 0x5e > buf.length || buf.toString("latin1", pe, pe + 4) !== "PE\0\0") return null;
+  const machine = buf.readUInt16LE(pe + 4);
+  const opt = pe + 24;
+  const magic = buf.readUInt16LE(opt);
+  if (magic !== 0x20b && magic !== 0x10b) return null;
+  return { machine, magic, subsystem: buf.readUInt16LE(opt + 68) };
+}
+
+/** `apksigner verify --print-certs` with the doctor's SDK and Java (null when either is missing). */
+function apksignerVerify(doc: Doctor, apk: string): { ok: boolean; label: string } | null {
+  const sdk = doc.androidSdk.path, bt = doc.androidSdk.buildTools, java = javaHome(doc);
+  if (!sdk || !bt || !java) return null;
+  const tool = path.join(sdk, "build-tools", bt, process.platform === "win32" ? "apksigner.bat" : "apksigner");
+  if (!existsSync(tool)) return null;
+  const r = spawnSync(tool, ["verify", "--print-certs", apk], { encoding: "utf8", env: { ...process.env, JAVA_HOME: java, PATH: `${path.join(java, "bin")}${path.delimiter}${process.env.PATH ?? ""}` } });
+  const cn = (r.stdout ?? "").match(/certificate DN: (.*)/)?.[1];
+  return { ok: r.status === 0, label: r.status === 0 ? `apksigner verify ok${cn ? ` (${cn})` : ""}` : `apksigner verify failed: ${(r.stderr || r.stdout || "").trim().slice(-200)}` };
+}
+
+async function checkBuild(cfg: ShipConfig, p: TargetPlan, doc?: Doctor): Promise<Array<{ ok: boolean; label: string }>> {
   const c: Array<{ ok: boolean; label: string }> = [];
   const files = existsSync(p.buildDir) ? await listFiles(p.buildDir) : [];
   const secrets = existsSync(p.buildDir) ? await scanSecrets(p.buildDir) : [];
@@ -104,9 +128,12 @@ async function checkBuild(cfg: ShipConfig, p: TargetPlan): Promise<Array<{ ok: b
     }
   } else if (p.target === "windows" || p.target === "linux") {
     const bin = path.join(p.buildDir, p.target === "windows" ? `${cfg.id}.exe` : `${cfg.id}.x86_64`);
-    const head = existsSync(bin) ? (await readFile(bin)).subarray(0, 4) : Buffer.alloc(0);
-    const ok = p.target === "windows" ? head.subarray(0, 2).toString("latin1") === "MZ" : head.equals(Buffer.from([0x7f, 0x45, 0x4c, 0x46]));
-    c.push({ ok, label: `${path.basename(bin)} is ${p.target === "windows" ? "a PE (MZ)" : "an ELF"} executable` });
+    const data = existsSync(bin) ? await readFile(bin) : Buffer.alloc(0);
+    if (p.target === "windows") {
+      const pe = peInfo(data);
+      c.push({ ok: !!pe && pe.machine === 0x8664, label: pe ? `${path.basename(bin)} is a PE32+ x86-64 executable (${pe.subsystem === 2 ? "GUI" : pe.subsystem === 3 ? "console" : `subsystem ${pe.subsystem}`})` : `${path.basename(bin)} is not a valid PE executable` });
+    } else c.push({ ok: data.subarray(0, 4).equals(Buffer.from([0x7f, 0x45, 0x4c, 0x46])), label: `${path.basename(bin)} is an ELF executable` });
+    c.push({ ok: data.length > 8 && data.subarray(-4).toString("latin1") === "GDPC", label: "Godot pack embedded at the end of the executable (GDPC)" });
     c.push({ ok: !files.some((f) => f.endsWith(".pck")), label: "game data embedded in the executable (single file)" });
   } else if (p.target === "android") {
     const apk = p.artifact;
@@ -115,6 +142,8 @@ async function checkBuild(cfg: ShipConfig, p: TargetPlan): Promise<Array<{ ok: b
       c.push({ ok: idx.some((e) => e.name === "AndroidManifest.xml") && idx.some((e) => e.name.startsWith("classes")), label: "APK has AndroidManifest.xml and classes.dex" });
       const raw = await readFile(apk);
       c.push({ ok: raw.includes(Buffer.from("APK Sig Block 42")) || idx.some((e) => /^META-INF\/.*\.(RSA|EC|DSA)$/.test(e.name)), label: "APK is signed" });
+      const v = doc ? apksignerVerify(doc, apk) : null;
+      if (v) c.push(v);
     } else c.push({ ok: false, label: "APK present" });
   }
   return c;
@@ -149,8 +178,19 @@ export async function ship(root: string, id: string, opts: ShipOptions = {}): Pr
       const merged = mergePresets(existing, cfg, godotTargets);
       await writeFile(file, merged.text);
       log(`export_presets.cfg: kept ${merged.kept.length} preset(s), added ${merged.added.join(", ")}`);
-      if (!existsSync(path.join(src, ".godot"))) {
-        log("importing the project (first run)…");
+      let reimport = false;
+      const pg = path.join(src, "project.godot");
+      if (godotTargets.includes("android") && existsSync(pg)) {
+        const text = await readFile(pg, "utf8");
+        if (!hasEtc2Astc(text)) {
+          if (!existsSync(`${pg}.easyship.bak`)) await writeFile(`${pg}.easyship.bak`, text);
+          await writeFile(pg, withEtc2Astc(text));
+          reimport = true;
+          log("project.godot: turned on ETC2/ASTC texture import (Android needs it; backup project.godot.easyship.bak)");
+        }
+      }
+      if (reimport || !existsSync(path.join(src, ".godot"))) {
+        log(reimport ? "re-importing the project (texture formats changed)…" : "importing the project (first run)…");
         for (let i = 0; i < 2; i++) await exec([doc.godot.path!, "--headless", "--editor", "--quit", "--path", src], process.env, 600_000);
       }
     }
@@ -169,13 +209,20 @@ export async function ship(root: string, id: string, opts: ShipOptions = {}): Pr
           if (s.kind === "godot-export") {
             log(`${p.target}: ${s.command!.slice(1).join(" ")}`);
             const env: NodeJS.ProcessEnv = { ...process.env };
+            let cleanup = async () => {};
+            if (p.target === "android") {
+              const a = await prepareAndroidEnv(doc, { release: !!cfg.android?.release, godotVersion: doc.godot.version });
+              Object.assign(env, a.env);
+              cleanup = a.cleanup;
+              for (const n of a.notes) { r.checks.push({ ok: true, label: `note: ${n}` }); log(`android: ${n}`); }
+            }
             if (p.target === "android" && cfg.android?.release && cfg.android.keystore) {
               env.GODOT_ANDROID_KEYSTORE_RELEASE_PATH = path.resolve(root, cfg.android.keystore.path);
               env.GODOT_ANDROID_KEYSTORE_RELEASE_USER = cfg.android.keystore.alias;
               env.GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD = process.env.EASYSHIP_KEYSTORE_PASSWORD;
             }
-            const res = await exec(s.command!, env, 900_000);
-            r.log = res.out.split("\n").filter((l) => /ERROR|error|WARNING|savepack|export/i.test(l)).slice(-12).join("\n");
+            const res = await exec(s.command!, env, 900_000).finally(() => cleanup());
+            r.log = godotExportError(res.out);
             const outFile = s.command!.at(-1)!;
             if (res.code !== 0 || !existsSync(outFile)) throw new Error(`Godot export failed (exit ${res.code}). ${r.log || res.out.slice(-600)}`);
             if (p.target === "android") {
@@ -183,7 +230,7 @@ export async function ship(root: string, id: string, opts: ShipOptions = {}): Pr
             }
           }
         }
-        r.checks = await checkBuild(cfg, p);
+        r.checks = [...r.checks, ...(await checkBuild(cfg, p, doc))];
         for (const n of p.notes ?? []) { r.checks.push({ ok: true, label: `note: ${n}` }); log(`${p.target}: ${n}`); }
         const failed = r.checks.filter((c) => !c.ok);
         if (failed.length) throw new Error(`checks failed: ${failed.map((c) => c.label).join("; ")}`);
