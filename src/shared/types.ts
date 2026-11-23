@@ -36,7 +36,7 @@ export interface Diagnostic {
   message: string;
 }
 
-export type StepKind = "import" | "presets" | "godot-export" | "copy-static" | "vendor-pixi" | "package" | "checks" | "butler-push";
+export type StepKind = "import" | "project-setting" | "presets" | "godot-export" | "copy-static" | "vendor-pixi" | "package" | "checks" | "butler-push";
 export interface Step {
   kind: StepKind;
   label: string;

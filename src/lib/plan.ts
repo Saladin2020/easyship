@@ -1,4 +1,5 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { hasEtc2Astc } from "./android.js";
 import path from "node:path";
 import { ITCH_CHANNELS, type ShipConfig, type ShipPlan, type Step, type Target, type TargetPlan } from "../shared/types.js";
 import { TEMPLATE_FILES, type Doctor } from "./doctor.js";
@@ -53,6 +54,9 @@ export function planShip(root: string, cfg: ShipConfig, doc: Doctor, opts: PlanO
       if (t === "windows") notes.push("icon/metadata patching (rcedit) is off; the exe works without it. Not code-signed: Windows SmartScreen may warn");
       if (t === "web" && !cfg.web?.threads) notes.push("single-threaded web build: runs on itch.io without SharedArrayBuffer / COOP-COEP headers");
       if (t === "web" && cfg.web?.threads) notes.push("threaded web build: enable 'SharedArrayBuffer support' in the itch.io embed options");
+      if (t === "android" && existsSync(path.join(src, "project.godot")) && !hasEtc2Astc(readFileSync(path.join(src, "project.godot"), "utf8"))) {
+        steps.push({ kind: "project-setting", label: "turn on ETC2/ASTC texture import in project.godot (Android needs it; backup project.godot.easyship.bak) and re-import", out: path.join(src, "project.godot") });
+      }
       if (!existsSync(path.join(src, ".godot"))) steps.push({ kind: "import", label: "first import of the project (creates .godot/)", command: [godot, "--headless", "--editor", "--quit", "--path", src] });
       steps.push({ kind: "presets", label: `add "${PRESET_NAME[t]}" to export_presets.cfg (your presets are kept; backup export_presets.cfg.easyship.bak)`, out: path.join(src, "export_presets.cfg") });
       const debug = t === "android" && !cfg.android?.release;
