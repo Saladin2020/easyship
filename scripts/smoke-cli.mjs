@@ -36,8 +36,9 @@ ok(existsSync(path.join(ws, "releases/firefly_pixi/0.1.0/firefly_pixi-0.1.0-web.
 ok(/"status": "built"/.test(cli("report", "firefly_pixi")), "report");
 ok((() => { const o = cli("ship", "firefly_pixi", "--upload"); return !/web +uploaded/.test(o) && /not uploaded/.test(o); })(), "--upload without butler uploads nothing");
 ok(/0\.1\.1/.test(cli("bump", "firefly_pixi")), "bump");
-cli("new", "copy", "--source", "games/firefly_pixi", "--th", "สำเนา", "--en", "Copy", "--itch", "me/copy");
+cli("new", "copy", "--source", "games/firefly_pixi", "--th", "สำเนา", "--en", "Copy", "--itch", "me/copy", "--release", "2.0.1");
 ok(JSON.parse(readFileSync(path.join(ws, "ships", "copy.easyship.json"), "utf8")).engine === "pixi", "new (engine detected)");
+ok(JSON.parse(readFileSync(path.join(ws, "ships", "copy.easyship.json"), "utf8")).version === "2.0.1", "new --release sets the version");
 const cfg = JSON.parse(readFileSync(path.join(ws, "ships", "copy.easyship.json"), "utf8"));
 cfg.itch.apiKey = "sk_live_should_not_print";
 writeFileSync(path.join(ws, "ships", "copy.easyship.json"), JSON.stringify(cfg));

@@ -183,17 +183,17 @@ program
   .option("--ms <name>")
   .option("--engine <e>", ENGINES.join(" | "))
   .option("--targets <list>", "Targets", "web")
-  .option("--version <v>", "Version", "0.1.0")
+  .option("--release <v>", "Version of the game (semver)", "0.1.0")
   .option("--itch <user/game>")
   .option("--android-package <pkg>")
   .option("--workspace <path>")
-  .action(async (id: string, o: { source: string; th: string; en: string; ms?: string; engine?: string; targets: string; version: string; itch?: string; androidPackage?: string; workspace?: string }) => {
+  .action(async (id: string, o: { source: string; th: string; en: string; ms?: string; engine?: string; targets: string; release: string; itch?: string; androidPackage?: string; workspace?: string }) => {
     try {
       const root = workspaceOf(o.workspace);
       const { existsSync } = await import("node:fs");
       const engine = (o.engine ?? (existsSync(path.resolve(root, o.source, "project.godot")) ? "godot" : "pixi")) as ShipConfig["engine"];
       const [user, game] = o.itch?.split("/") ?? [];
-      const cfg: ShipConfig = { format: FORMAT, id, name: { th: o.th, en: o.en, ...(o.ms ? { ms: o.ms } : {}) }, version: o.version, engine, source: o.source, targets: targetsOf(o.targets)!, ...(user && game ? { itch: { user, game } } : {}), ...(o.androidPackage ? { android: { package: o.androidPackage } } : {}) };
+      const cfg: ShipConfig = { format: FORMAT, id, name: { th: o.th, en: o.en, ...(o.ms ? { ms: o.ms } : {}) }, version: o.release, engine, source: o.source, targets: targetsOf(o.targets)!, ...(user && game ? { itch: { user, game } } : {}), ...(o.androidPackage ? { android: { package: o.androidPackage } } : {}) };
       const r = await saveConfig(root, cfg);
       for (const e of r.errors) console.log(`error   ${e.path}: ${e.message}`);
       for (const w of r.warnings) console.log(`warning ${w.path}: ${w.message}`);
