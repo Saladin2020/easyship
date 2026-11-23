@@ -1,0 +1,11 @@
+node_modules/
+dist/
+web/dist/
+.scratch/
+/exports/
+*.log
+.DS_Store
+.env
+.env.*
+.cursor/
+*.local.json

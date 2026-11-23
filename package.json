@@ -1,0 +1,61 @@
+{
+  "name": "easyship",
+  "version": "0.1.0",
+  "description": "Local CLI + web tool that ships Godot 4.3+ and PixiJS v8 games: toolchain doctor, one-command web / Windows / Linux / Android builds, itch.io-ready zips and butler plans (dry-run by default, upload only with an explicit flag)",
+  "type": "module",
+  "bin": {
+    "easyship": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "runtime",
+    "samples",
+    "assets",
+    "web/dist",
+    "README.md",
+    "CREDITS.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "dev": "tsx src/cli.ts serve --dev",
+    "build": "npm run build:server && npm run build:web",
+    "build:server": "tsup src/cli.ts src/mcp/server.ts --format esm --dts --clean --out-dir dist",
+    "build:web": "vite build --config web/vite.config.ts",
+    "serve": "tsx src/cli.ts serve",
+    "mcp": "tsx src/mcp/server.ts",
+    "mcp:http": "tsx src/mcp/server.ts --http --port 8979",
+    "init": "tsx src/cli.ts init",
+    "capture:ui": "python3 scripts/capture-ui.py",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p web/tsconfig.json --noEmit && tsc -p test/tsconfig.json --noEmit",
+    "test": "vitest run",
+    "smoke:tools": "node scripts/smoke-mcp-tools.mjs",
+    "smoke:cli": "node scripts/smoke-cli.mjs",
+    "smoke": "npm run smoke:tools && npm run smoke:cli",
+    "check:pixi": "python3 scripts/check-pixi.py"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@hono/node-server": "^2.1.8",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "commander": "^14.0.3",
+    "hono": "^4.13.18",
+    "open": "^10.2.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^4.7.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.8",
+    "vitest": "^5.1.0"
+  }
+}
