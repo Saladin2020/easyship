@@ -1,0 +1,12 @@
+{
+  "format": "easyship/1",
+  "id": "firefly_pixi",
+  "name": { "th": "หิ่งห้อย (เว็บ)", "en": "Firefly Night (web)", "ms": "Malam Kelip-kelip (web)" },
+  "version": "0.1.0",
+  "engine": "pixi",
+  "source": "games/firefly_pixi",
+  "targets": ["web"],
+  "itch": { "user": "your-itch-name", "game": "firefly-night-web" },
+  "pixi": { "entry": "index.html", "vendor": true },
+  "exclude": ["*.map", "node_modules/**", ".git/**"]
+}

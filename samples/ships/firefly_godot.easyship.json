@@ -1,0 +1,12 @@
+{
+  "format": "easyship/1",
+  "id": "firefly_godot",
+  "name": { "th": "หิ่งห้อย", "en": "Firefly Night", "ms": "Malam Kelip-kelip" },
+  "version": "0.1.0",
+  "engine": "godot",
+  "source": "games/firefly_godot",
+  "targets": ["web", "windows", "linux", "android"],
+  "itch": { "user": "your-itch-name", "game": "firefly-night" },
+  "web": { "threads": false, "canvasResize": "adaptive" },
+  "android": { "package": "org.easysuite.firefly", "versionCode": 1, "minSdk": 24 }
+}
