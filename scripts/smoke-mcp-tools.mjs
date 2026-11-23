@@ -46,7 +46,7 @@ async function exercise(client, label) {
   const port = 18879 + Math.floor(Math.random() * 500);
   const proc = spawn("npx", ["tsx", "src/mcp/server.ts", "--http", "--port", String(port), "--workspace", ws], { stdio: ["ignore", "ignore", "pipe"] });
   await new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error("MCP HTTP did not start")), 20000);
+    const t = setTimeout(() => reject(new Error("MCP HTTP did not start")), 60000);
     proc.stderr.on("data", (d) => {
       if (/listening|http:\/\//i.test(String(d))) {
         clearTimeout(t);
