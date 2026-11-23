@@ -133,8 +133,8 @@ input[type="number"], input.search, .save input { background: var(--wood0); bord
 .sim-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 10px; }
 
 /* ---- Easy Ship ---- */
-.doctor p { margin: 2px 0; font-size: 0.8rem; display: flex; flex-direction: column; }
-.doctor p small { color: var(--muted); font-size: 0.7rem; overflow-wrap: anywhere; }
+.doctor p { margin: 3px 0; font-size: 0.8rem; }
+.doctor p small { display: block; color: var(--muted); font-size: 0.68rem; overflow-wrap: anywhere; padding-left: 1.1rem; }
 .doctor p.ok b, .checks li.ok, p.ok { color: #7fc88a; }
 .doctor p.bad b, .checks li.bad { color: var(--rose); }
 .targets { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 0.6rem; margin-top: 0.6rem; }

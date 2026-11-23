@@ -113,7 +113,7 @@ function Game({ id, onStatus, onSaved }: { id: string; onStatus: (m: string) => 
                 <h3>{TARGET_TH[t.target]} · {t.target} <span className={`pill ${r?.status ?? t.status}`}>{r?.status ?? t.status}</span></h3>
                 {r?.artifact && <p className="mono small">{r.artifact.split("/").pop()} · {mb(r.bytes)}{r.sha256 ? ` · ${r.sha256.slice(0, 12)}…` : ""}</p>}
                 {t.blockers.map((b) => <p key={b} className="err">✗ {b}</p>)}
-                {r?.error && <p className="err">{r.error}</p>}
+                {r?.error && r.status !== "blocked" && <p className="err">{r.error}</p>}
                 <ol className="steps">
                   {t.steps.map((s, i) => <li key={i}>{s.label}{s.command && <code>{sh(s.command)}</code>}</li>)}
                 </ol>

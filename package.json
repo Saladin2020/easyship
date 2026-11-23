@@ -31,7 +31,7 @@
     "smoke:tools": "node scripts/smoke-mcp-tools.mjs",
     "smoke:cli": "node scripts/smoke-cli.mjs",
     "smoke": "npm run smoke:tools && npm run smoke:cli",
-    "check:pixi": "python3 scripts/check-pixi.py"
+    "check:web": "python3 scripts/check-web.py"
   },
   "engines": {
     "node": ">=20"
