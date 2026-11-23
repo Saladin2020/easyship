@@ -184,6 +184,7 @@ export async function ship(root: string, id: string, opts: ShipOptions = {}): Pr
           }
         }
         r.checks = await checkBuild(cfg, p);
+        for (const n of p.notes ?? []) { r.checks.push({ ok: true, label: `note: ${n}` }); log(`${p.target}: ${n}`); }
         const failed = r.checks.filter((c) => !c.ok);
         if (failed.length) throw new Error(`checks failed: ${failed.map((c) => c.label).join("; ")}`);
         if (p.target !== "android") {
